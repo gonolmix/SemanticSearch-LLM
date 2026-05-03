@@ -1,0 +1,43 @@
+﻿@model SemanticSearch.Core.DTO.SearchResultDto
+
+@{
+    ViewData["Title"] = "Результаты поиска";
+}
+
+<div class="container mt-5">
+    <a asp-action="Index" class="btn btn-outline-secondary mb-3">&larr; Назад к поиску</a>
+
+    <h2>Результаты для: "@Model.Query"</h2>
+    <p class="text-muted">Время выполнения: @Model.TotalTimeMs мс. Найдено совпадений: @Model.Matches.Count</p>
+
+    @if (!Model.Matches.Any())
+    {
+        <div class="alert alert-warning">Ничего не найдено. Попробуйте изменить формулировку.</div>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var match in Model.Matches)
+            {
+                <div class="list-group-item list-group-item-action flex-column align-items-start p-3 mb-3 shadow-sm">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1 text-primary">@match.DocumentTitle</h5>
+                        <small class="text-success">Релевантность: @(match.RelevanceScore.ToString("P"))</small>
+                    </div>
+                    <p class="mb-1 mt-2" style="white-space: pre-wrap;">@match.ParagraphContent</p>
+
+                    @if (match.HighlightedWords.Any())
+                    {
+                        <div class="mt-2">
+                            <small class="text-muted">Ключевые слова: </small>
+                            @foreach (var word in match.HighlightedWords.Take(5))
+                            {
+                                <span class="badge bg-secondary">@word</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
