@@ -1,20 +1,58 @@
 ﻿@{
-    ViewData["Title"] = "Семантический поиск";
+    ViewData["Title"] = "Семантический поиск НС";
 }
 
 <div class="container mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <h1 class="text-center mb-4">Поиск по базе знаний Нейросетей</h1>
-            <div class="card p-4 shadow-sm">
-                <form asp-action="Search" method="post">
-                    <div class="mb-3">
-                        <label for="query" class="form-label">Введите ваш вопрос:</label>
-                        <input type="text" class="form-control form-control-lg" id="query" name="query" placeholder="Например: Как работает трансформер?" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">Найти ответ</button>
-                </form>
-                <div class="mt-3 text-muted small">
+        <div class="col-md-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">🧠 Поиск по базе знаний нейросетей</h3>
+                </div>
+                <div class="card-body p-4">
+                    @if (ViewBag.ErrorMessage != null)
+                    {
+                        <div class="alert alert-danger">@ViewBag.ErrorMessage</div>
+                    }
+
+                    <form asp-controller="Search" asp-action="Search" method="post">
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-4">
+                            <label for="query" class="form-label fw-bold">Ваш вопрос:</label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   id="query"
+                                   name="query"
+                                   placeholder="Например: Как работает токенизация текста?"
+                                   required
+                                   value="@ViewData["Query"]">
+                        </div>
+
+                        <div class="row align-items-end">
+                            <div class="col-md-4 mb-3">
+                                <label for="algorithm" class="form-label">Алгоритм поиска:</label>
+                                <select class="form-select form-select-lg" id="algorithm" name="algorithm">
+                                    <option value="Hybrid" selected>🏆 Гибридный (Лучший)</option>
+                                    <option value="Vector"> Векторный (Семантический)</option>
+                                    <option value="BM25">📊 BM25 (Ключевые слова)</option>
+                                    <option value="Tfidf">📈 TF-IDF (Базовый)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <button type="submit" class="btn btn-primary btn-lg w-100">
+                                    🔍 Найти ответ
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-text text-muted mt-2">
+                            <ul>
+                                <li><b>Гибридный</b>: Совмещает семантику и точные совпадения.</li>
+                                <li><b>Векторный</b>: Понимает смысл, даже если нет совпадающих слов.</li>
+                            </ul>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

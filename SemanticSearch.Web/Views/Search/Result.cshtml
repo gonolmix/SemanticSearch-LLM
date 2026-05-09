@@ -1,43 +1,70 @@
-﻿@model SemanticSearch.Core.DTO.SearchResultDto
-
+﻿@model SemanticSearch.Core.DTO.SearchResponseDto
 @{
     ViewData["Title"] = "Результаты поиска";
 }
 
-<div class="container mt-5">
-    <a asp-action="Index" class="btn btn-outline-secondary mb-3">&larr; Назад к поиску</a>
+<div class="container mt-4">
+    <!-- Хлебные крошки -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a asp-action="Index">Поиск</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Результаты</li>
+        </ol>
+    </nav>
 
-    <h2>Результаты для: "@Model.Query"</h2>
-    <p class="text-muted">Время выполнения: @Model.TotalTimeMs мс. Найдено совпадений: @Model.Matches.Count</p>
+    <div class="card mb-4">
+        <div class="card-body bg-light">
+            <h4>Результаты для: "<span class="text-primary">@Model.Query</span>"</h4>
+            <div class="row text-muted small">
+                <div class="col">Алгоритм: <span class="badge bg-secondary">@Model.AlgorithmUsed</span></div>
+                <div class="col">Время: <span class="badge bg-info">@Model.TotalTimeMs мс</span></div>
+                <div class="col">Найдено: @Model.TotalResults абзацев</div>
+                @if (Model.FromCache)
+                {
+                    <div class="col text-warning">Из кэша</div>
+                }
+            </div>
+        </div>
+    </div>
 
     @if (!Model.Matches.Any())
     {
-        <div class="alert alert-warning">Ничего не найдено. Попробуйте изменить формулировку.</div>
+        <div class="alert alert-warning text-center p-5">
+            <h5> Ничего не найдено</h5>
+            <p>Попробуйте изменить формулировку запроса или переключить алгоритм на "Векторный".</p>
+        </div>
     }
     else
     {
-        <div class="list-group">
-            @foreach (var match in Model.Matches)
-            {
-                <div class="list-group-item list-group-item-action flex-column align-items-start p-3 mb-3 shadow-sm">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1 text-primary">@match.DocumentTitle</h5>
-                        <small class="text-success">Релевантность: @(match.RelevanceScore.ToString("P"))</small>
+        @foreach (var match in Model.Matches)
+        {
+            <div class="card mb-3 shadow-sm border-start border-primary border-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-primary">@match.DocumentTitle</h5>
+                        <span class="badge bg-success fs-6">@match.RelevanceScore%</span>
                     </div>
-                    <p class="mb-1 mt-2" style="white-space: pre-wrap;">@match.ParagraphContent</p>
 
-                    @if (match.HighlightedWords.Any())
-                    {
-                        <div class="mt-2">
-                            <small class="text-muted">Ключевые слова: </small>
-                            @foreach (var word in match.HighlightedWords.Take(5))
-                            {
-                                <span class="badge bg-secondary">@word</span>
-                            }
+                    <p class="card-text fs-5" style="white-space: pre-wrap;">@match.ParagraphContent</p>
+
+                    <!-- Детализация оценки (Debug info) -->
+                    <div class="mt-3 pt-2 border-top">
+                        <small class="text-muted">Детализация оценки:</small>
+                        <div class="progress mt-1" style="height: 10px;">
+                            <div class="progress-bar bg-info" role="progressbar" style="width: @(match.VectorScore)%" title="Векторная семантика"></div>
+                            <div class="progress-bar bg-warning" role="progressbar" style="width: @(match.KeywordScore)%" title="Ключевые слова"></div>
                         </div>
-                    }
+                        <div class="row text-center mt-1 small text-muted">
+                            <div class="col">
+                                Вектор (Смысл): <b>@match.VectorScore%</b>
+                            </div>
+                            <div class="col">
+                                Ключевые слова: <b>@match.KeywordScore%</b>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            }
-        </div>
+            </div>
+        }
     }
 </div>

@@ -23,5 +23,10 @@
   <ItemGroup>
     <ProjectReference Include="..\SemanticSearch.Application\SemanticSearch.Application.csproj" />
   </ItemGroup>
+	<ItemGroup>
+		<None Update="ml-models\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>

@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SemanticSearch.Core.Models;
+using SemanticSearch.Core.Entities;
 using SemanticSearch.Infrastructure.Data;
 using System;
 using System.Collections.Generic;
@@ -26,11 +26,6 @@ namespace SemanticSearch.Infrastructure.Repositories
         public async Task<List<Synonym>> GetSynonymsAsync()
         {
             return await _context.Synonyms.ToListAsync();
-        }
-
-        public async Task<List<MorphologyRule>> GetMorphologyRulesAsync()
-        {
-            return await _context.MorphologyRules.ToListAsync();
         }
 
         public async Task<List<Paragraph>> GetAllParagraphsAsync()
