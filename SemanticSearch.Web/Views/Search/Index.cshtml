@@ -1,5 +1,5 @@
 ﻿@{
-    ViewData["Title"] = "Семантический поиск НС";
+    ViewData["Title"] = "Semantic Search";
 }
 
 <div class="container mt-5">
@@ -7,7 +7,7 @@
         <div class="col-md-10">
             <div class="card shadow-lg border-0">
                 <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">🧠 Поиск по базе знаний нейросетей</h3>
+                    <h3 class="mb-0">Search the neural network knowledge base</h3>
                 </div>
                 <div class="card-body p-4">
                     @if (ViewBag.ErrorMessage != null)
@@ -19,37 +19,35 @@
                         @Html.AntiForgeryToken()
 
                         <div class="mb-4">
-                            <label for="query" class="form-label fw-bold">Ваш вопрос:</label>
+                            <label for="query" class="form-label fw-bold">Your question:</label>
                             <input type="text"
                                    class="form-control form-control-lg"
                                    id="query"
                                    name="query"
-                                   placeholder="Например: Как работает токенизация текста?"
+                                   placeholder="Foe example: How text tokenization works?"
                                    required
                                    value="@ViewData["Query"]">
                         </div>
 
                         <div class="row align-items-end">
                             <div class="col-md-4 mb-3">
-                                <label for="algorithm" class="form-label">Алгоритм поиска:</label>
+                                <label for="algorithm" class="form-label">Search type:</label>
                                 <select class="form-select form-select-lg" id="algorithm" name="algorithm">
-                                    <option value="Hybrid" selected>🏆 Гибридный (Лучший)</option>
-                                    <option value="Vector"> Векторный (Семантический)</option>
-                                    <option value="BM25">📊 BM25 (Ключевые слова)</option>
-                                    <option value="Tfidf">📈 TF-IDF (Базовый)</option>
+                                    <option value="Hybrid" selected>Hybrid</option>
+                                    <option value="Vector">Vector</option>
                                 </select>
                             </div>
                             <div class="col-md-8 mb-3">
                                 <button type="submit" class="btn btn-primary btn-lg w-100">
-                                    🔍 Найти ответ
+                                    Find the answer
                                 </button>
                             </div>
                         </div>
 
                         <div class="form-text text-muted mt-2">
                             <ul>
-                                <li><b>Гибридный</b>: Совмещает семантику и точные совпадения.</li>
-                                <li><b>Векторный</b>: Понимает смысл, даже если нет совпадающих слов.</li>
+                                <li><b>Hybrid</b>: Combines semantics and exact word matches.</li>
+                                <li><b>Vector</b>: Understands the meaning even if there are no matching words.</li>
                             </ul>
                         </div>
                     </form>

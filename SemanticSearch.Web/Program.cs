@@ -7,8 +7,8 @@ using SemanticSearch.Application.Services;
 using SemanticSearch.Infrastructure.Data;
 using SemanticSearch.Infrastructure.Repositories;
 using SemanticSearch.Infrastructure.VectorStore;
-// Убедитесь, что этот using есть, здесь лежит ApplicationDbContext
 using SemanticSearch.Web.Data;
+using System.Text.Json.Serialization;
 
 namespace SemanticSearch.Web
 {
@@ -18,11 +18,9 @@ namespace SemanticSearch.Web
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // 1. MVC
+            // MVC
             builder.Services.AddControllersWithViews();
 
-            // 2. Подключаем оба контекста (Search и Identity)
-            // Убедитесь, что строка подключения в appsettings.json верная
             var connectionString = builder.Configuration.GetConnectionString("LocalConnection");
 
             // Контекст для Поиска (в Infrastructure)
@@ -33,7 +31,7 @@ namespace SemanticSearch.Web
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
-            // 3. Настройка Identity 
+            // Настройка Identity 
             builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
             {
                 options.Password.RequireDigit = true;
@@ -45,21 +43,20 @@ namespace SemanticSearch.Web
             .AddEntityFrameworkStores<ApplicationDbContext>() 
             .AddDefaultTokenProviders();
 
-            // 4. Memory Cache
+            // Memory Cache
             builder.Services.AddMemoryCache();
 
-            // 5. HttpClient для API синонимов
             builder.Services.AddSingleton<ISynonymApiService, SynonymApiService>();
 
-            // 6. Репозитории
+            // Репозитории
             builder.Services.AddScoped<LinguisticRepository>();
             builder.Services.AddScoped<ParagraphRepository>();
             builder.Services.AddScoped<VectorRepository>();
 
-            // 7. Векторное хранилище
+            // Векторное хранилище
             builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>();
 
-            // 8. Сервисы
+            // Сервисы
             builder.Services.AddScoped<ILinguisticService, LinguisticService>();
             builder.Services.AddScoped<ISynonymApiService, SynonymApiService>();
             builder.Services.AddScoped<IRankingService, RankingService>();
@@ -71,12 +68,20 @@ namespace SemanticSearch.Web
 
             // Главный сервис поиска
             builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
+            
 
+
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                });
             var app = builder.Build();
 
             // Инициализация при старте (Ленивая загрузка модели)
             // Модель загрузится только при первом запросе поиска, чтобы не тормозить старт
-            // Но мы можем заранее загрузить лингвистические данные
+
             using (var scope = app.Services.CreateScope())
             {
                 var linguisticService = scope.ServiceProvider.GetRequiredService<ILinguisticService>();
@@ -94,13 +99,14 @@ namespace SemanticSearch.Web
             app.UseStaticFiles();
             app.UseRouting();
 
-            // ВАЖНО: Order matters! Authentication must come before Authorization
             app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Search}/{action=Index}/{id?}");
+            
+            app.MapControllers();
 
             using (var scope = app.Services.CreateScope())
             {
@@ -108,13 +114,13 @@ namespace SemanticSearch.Web
                 var searchService = scope.ServiceProvider.GetRequiredService<ISemanticSearchService>();
                 var linguisticService = scope.ServiceProvider.GetRequiredService<ILinguisticService>();
 
-                // Загружаем лингвистические данные
+                // лингвистические данные
                 await linguisticService.LoadDataAsync();
 
                 //_logger.LogInformation("Pre-loading embedding model...");
                 await embeddingService.InitializeAsync();
 
-                // Индексируем все абзацы
+                // Индексируются все абзацы
                 //_logger.LogInformation("Pre-indexing paragraphs...");
                 await searchService.IndexPendingParagraphsAsync();
 

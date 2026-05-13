@@ -51,6 +51,9 @@ namespace SemanticSearch.Application.Services
 
         public async Task<SearchResponseDto> SearchAsync(SearchRequestDto request)
         {
+            var process = Process.GetCurrentProcess();
+            _logger.LogInformation($"CPU Count: {Environment.ProcessorCount}");
+            _logger.LogInformation($"Process Threads: {process.Threads.Count}");
             var stopwatch = Stopwatch.StartNew();
             var threadId = Thread.CurrentThread.ManagedThreadId;
 
@@ -96,7 +99,7 @@ namespace SemanticSearch.Application.Services
             float[]? queryVector = null;
             var vectorSearchTime = 0;
 
-            if (request.Algorithm is SearchAlgorithm.Vector or SearchAlgorithm.Hybrid or SearchAlgorithm.HybridSemantic)
+            if (request.Algorithm is SearchAlgorithm.Vector or SearchAlgorithm.Hybrid)
             {
                 var vectorStopwatch = Stopwatch.StartNew();
                 queryVector = await _embeddingService.GenerateEmbeddingAsync(request.Query);
@@ -140,7 +143,6 @@ namespace SemanticSearch.Application.Services
                     DocumentTitle = r.Paragraph.Document?.Title ?? "Unknown",
                     ParagraphContent = r.Paragraph.Content,
 
-                    // 🔥 ПРОСТОЕ умножение на 100 для отображения
                     RelevanceScore = Math.Round(r.TotalScore * 100, 2),
                     VectorScore = Math.Round(r.VectorScore * 100, 2),
                     KeywordScore = 0,
@@ -233,48 +235,48 @@ namespace SemanticSearch.Application.Services
 
         public async Task<int> IndexPendingParagraphsAsync()
 {
-    var pending = await _paragraphRepo.GetNotIndexedAsync();
-    var indexed = 0;
+        var pending = await _paragraphRepo.GetNotIndexedAsync();
+        var indexed = 0;
 
-    _logger?.LogInformation($"Indexing {pending.Count()} pending paragraphs...");
+        _logger?.LogInformation($"Indexing {pending.Count()} pending paragraphs...");
 
-    foreach (var paragraph in pending)
-    {
-        try
+        foreach (var paragraph in pending)
         {
-            _logger?.LogDebug($"Generating embedding for paragraph {paragraph.Id} (length: {paragraph.Content.Length})");
-            
-            // Генерация эмбеддинга
-            var embedding = await _embeddingService.GenerateEmbeddingAsync(paragraph.Content);
-            
-            _logger?.LogDebug($"Embedding generated: dim={embedding.Length}, first3=[{string.Join(", ", embedding.Take(3))}]");
-            
-            // Сохранение в БД
-            var vectorEntity = new ParagraphVector
+            try
             {
-                ParagraphId = paragraph.Id,
-                VectorData = VectorMath.FloatsToBytes(embedding),
-                VectorDimension = embedding.Length,
-                ModelName = _embeddingService.ModelName,
-                Normalized = true
-            };
+                _logger?.LogDebug($"Generating embedding for paragraph {paragraph.Id} (length: {paragraph.Content.Length})");
             
-            await _vectorRepo.AddAsync(vectorEntity);
-            await _paragraphRepo.MarkAsIndexedAsync(paragraph.Id);
-            await _vectorStore.AddVectorAsync(paragraph.Id, embedding);
+                // Генерация эмбеддинга
+                var embedding = await _embeddingService.GenerateEmbeddingAsync(paragraph.Content);
             
-            paragraph.Embedding = embedding;
+                _logger?.LogDebug($"Embedding generated: dim={embedding.Length}, first3=[{string.Join(", ", embedding.Take(3))}]");
             
-            indexed++;
+                // Сохранение в БД
+                var vectorEntity = new ParagraphVector
+                {
+                    ParagraphId = paragraph.Id,
+                    VectorData = VectorMath.FloatsToBytes(embedding),
+                    VectorDimension = embedding.Length,
+                    ModelName = _embeddingService.ModelName,
+                    Normalized = true
+                };
+            
+                await _vectorRepo.AddAsync(vectorEntity);
+                await _paragraphRepo.MarkAsIndexedAsync(paragraph.Id);
+                await _vectorStore.AddVectorAsync(paragraph.Id, embedding);
+            
+                paragraph.Embedding = embedding;
+            
+                indexed++;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, $"Failed to index paragraph {paragraph.Id}");
+            }
         }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, $"Failed to index paragraph {paragraph.Id}");
-        }
-    }
 
-    _logger?.LogInformation($"Indexed {indexed} paragraphs");
-    return indexed;
+        _logger?.LogInformation($"Indexed {indexed} paragraphs");
+        return indexed;
 }
 
         public async Task<bool> ReindexParagraphAsync(int paragraphId)
@@ -330,8 +332,7 @@ namespace SemanticSearch.Application.Services
 
         private async Task LogQueryAsync(SearchRequestDto request, SearchResponseDto response)
         {
-            // В реальном приложении: сохранить в БД через SearchQueryLog repository
-            await Task.CompletedTask; // Заглушка
+            await Task.CompletedTask;
         }
     }
 }

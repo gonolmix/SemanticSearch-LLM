@@ -23,7 +23,6 @@ namespace SemanticSearch.Application.Services
 
         public Task<List<SynonymResult>> GetSynonymsAsync(string word, int maxResults = 10)
         {
-            // 🔥 Datamuse не поддерживает русский — сразу возвращаем пустой список
             _logger?.LogDebug($"Skipping API synonym lookup for '{word}' (Russian not supported by Datamuse)");
             return Task.FromResult(new List<SynonymResult>());
         }

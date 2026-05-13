@@ -24,58 +24,76 @@ namespace SemanticSearch.Application.Services
 
         public void InitializeStats(IEnumerable<Paragraph> paragraphs)
         {
-            // Пустая заглушка - пока не используем TF-IDF
         }
 
-        public async Task<List<ParagraphScore>> RankAsync(
-            string query,
-            List<Paragraph> paragraphs,
-            float[] queryVector,
-            SearchAlgorithm algorithm)
+        public async Task<List<ParagraphScore>> RankAsync(string query, List<Paragraph> paragraphs, float[] queryVector, SearchAlgorithm algorithm)
         {
-            _logger.LogError($"🔍 RANKING START: {paragraphs.Count} paragraphs, query vector dim={queryVector?.Length}");
-
+            _logger.LogInformation($"Ranking on Thread {Thread.CurrentThread.ManagedThreadId}, ManagedThreadId={Thread.CurrentThread.ManagedThreadId}");
             var results = new List<ParagraphScore>();
 
-            // 🔥 ПРОСТОЙ векторный поиск БЕЗ усложнений
+            // Веса для режимов
+            double vectorWeight = algorithm == SearchAlgorithm.Hybrid ? 0.80 : 1.0;
+            double keywordWeight = algorithm == SearchAlgorithm.Hybrid ? 0.20 : 0.0;
+
+            // Подсчёт бонуса за ключевые слова (только для Hybrid)
+            var keywordBonus = algorithm == SearchAlgorithm.Hybrid
+                ? CalculateKeywordBonus(query, paragraphs)
+                : new Dictionary<int, double>();
+
             foreach (var paragraph in paragraphs)
             {
                 if (paragraph.Embedding == null || paragraph.Embedding.Length == 0)
-                {
-                    _logger.LogWarning($"⚠️ Paragraph {paragraph.Id} has NO embedding!");
                     continue;
-                }
 
-                // 🔥 Косинусное сходство
+                // Векторный скор (0.0 - 1.0)
                 var similarity = VectorMath.CosineSimilarity(queryVector, paragraph.Embedding);
-                var score = (similarity + 1) / 2; // [-1, 1] → [0, 1]
+                var vectorScore = (similarity + 1) / 2;
 
-                _logger.LogError($"📊 Para {paragraph.Id}: similarity={similarity:F4}, score={score:F4}");
+                // Ключевые слова (0.0 - 1.0)
+                var keywordScore = keywordBonus.GetValueOrDefault(paragraph.Id, 0);
 
-                var paraScore = new ParagraphScore
+                // Итоговый скор
+                var totalScore = (vectorScore * vectorWeight) + (keywordScore * keywordWeight);
+                totalScore = Math.Min(totalScore, 1.0); // Кап на 100%
+
+                results.Add(new ParagraphScore
                 {
                     Paragraph = paragraph,
-                    VectorScore = score,
-                    TfidfScore = 0,
+                    VectorScore = vectorScore,
+                    TfidfScore = keywordScore,
                     BM25Score = 0,
-                    TotalScore = score // 🔥 Просто векторный скор, без бонусов!
-                };
-
-                results.Add(paraScore);
+                    TotalScore = totalScore
+                });
             }
 
-            // 🔥 Сортировка
-            var sorted = results.OrderByDescending(r => r.TotalScore).ToList();
+            return results.OrderByDescending(r => r.TotalScore).ToList();
+        }
 
-            _logger.LogError($"🏆 TOP 3:");
-            for (int i = 0; i < Math.Min(3, sorted.Count); i++)
+        // простой бонус за ключевые слова
+        private Dictionary<int, double> CalculateKeywordBonus(string query, List<Paragraph> paragraphs)
+        {
+            var bonuses = new Dictionary<int, double>();
+            var queryWords = query.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(w => w.ToLower().Trim(new[] { '.', ',', '!', '?', ';', ':', ' ', '\t', '\n' }))
+                .Where(w => w.Length > 3)
+                .ToList();
+
+            foreach (var p in paragraphs)
             {
-                _logger.LogError($"  #{i + 1}: Para {sorted[i].Paragraph.Id} - {sorted[i].TotalScore * 100:F2}%");
+                var content = p.Content.ToLower();
+                var title = p.Document?.Title?.ToLower() ?? "";
+
+                double bonus = 0;
+                foreach (var word in queryWords)
+                {
+                    if (title.Contains(word)) bonus += 0.5;
+                    else if (content.Contains(word)) bonus += 0.15;
+                }
+
+                bonuses[p.Id] = Math.Min(bonus, 1.0);
             }
 
-            _logger.LogError($"🔍 RANKING END");
-
-            return sorted;
+            return bonuses;
         }
 
         public Dictionary<int, double> CalculateTfidfScores(string query, List<Paragraph> paragraphs)

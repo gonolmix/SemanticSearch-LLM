@@ -21,7 +21,7 @@ namespace SemanticSearch.Core.Entities
         [Required]
         public byte[] VectorData { get; set; } = Array.Empty<byte>(); // Binary хранение
 
-        public int VectorDimension { get; set; } = 768;
+        public int VectorDimension { get; set; } = 384;
 
         [MaxLength(100)]
         public string ModelName { get; set; } = "paraphrase-multilingual-MiniLM-L12-v2";
