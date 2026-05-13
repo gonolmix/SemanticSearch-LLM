@@ -11,7 +11,7 @@ namespace SemanticSearch.Infrastructure.VectorStore
     public class InMemoryVectorStore : IVectorStore
     {
         private readonly ConcurrentDictionary<int, float[]> _vectors = new();
-        private int _dimension = 768;
+        private int _dimension = 384;
         private readonly SemaphoreSlim _lock = new(1, 1);
 
         public Task InitializeAsync(int dimension)

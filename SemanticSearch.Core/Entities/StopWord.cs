@@ -17,7 +17,7 @@ namespace SemanticSearch.Core.Entities
         public string Word { get; set; } = string.Empty;
 
         [MaxLength(10)]
-        public string Language { get; set; } = "ru";
+        public string Language { get; set; } = "en";
 
         public bool IsActive { get; set; } = true;
     }

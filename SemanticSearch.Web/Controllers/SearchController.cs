@@ -33,6 +33,7 @@ namespace SemanticSearch.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> Search(string query, SearchAlgorithm algorithm = SearchAlgorithm.Hybrid)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -49,7 +50,7 @@ namespace SemanticSearch.Web.Controllers
                 {
                     Query = query.Trim(),
                     Algorithm = algorithm,
-                    TopK = 100,
+                    TopK = 5,
                     UseCache = false,
                     LogQuery = true
                 };

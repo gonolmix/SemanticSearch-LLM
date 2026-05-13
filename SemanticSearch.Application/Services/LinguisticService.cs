@@ -23,8 +23,6 @@ namespace SemanticSearch.Application.AdditionalClasses
         private Dictionary<string, List<string>> _localSynonyms = new();
         private readonly ConcurrentDictionary<string, string> _lemmaCache = new();
 
-        // Snowball стеммер для русского (упрощённая версия)
-        // В продакшене используйте библиотеку Snowball.Stemmers
         private static readonly string[] _russianSuffixes = new[]
         {
             "ами", "ями", "ого", "его", "ому", "ему", "ыми", "ими",
@@ -66,10 +64,10 @@ namespace SemanticSearch.Application.AdditionalClasses
             if (string.IsNullOrWhiteSpace(text))
                 return new List<string>();
 
-            // Извлекаем слова (кириллица, латиница, цифры)
+            // Извлекаются слова (кириллица, латиница, цифры)
             var matches = Regex.Matches(text.ToLower(), @"[a-zA-Zа-яА-Я0-9]+");
 
-            // Фильтруем стоп-слова сразу
+            // фильтр стоп-слов
             return matches
                 .Select(m => m.Value)
                 .Where(t => !IsStopWord(t))
@@ -92,29 +90,13 @@ namespace SemanticSearch.Application.AdditionalClasses
 
             return _lemmaCache.GetOrAdd(lower, key =>
             {
-                // 🔥 Специальные правила для частых слов
-                if (key.EndsWith("цию")) return key.Substring(0, key.Length - 3) + "ция";
-                if (key.EndsWith("зации")) return key;
-                if (key.EndsWith("примеры")) return "пример";
-                if (key.EndsWith("алгоритмы")) return "алгоритм";
-                if (key.EndsWith("сети")) return "сеть";
-                if (key.EndsWith("модели")) return "модель";
-                if (key.EndsWith("нейроны")) return "нейрон";
-                if (key.EndsWith("веса")) return "вес";
-                if (key.EndsWith("данные")) return "данные";
-                if (key.EndsWith("обучения")) return "обучение";
-                if (key.EndsWith("токены")) return "токен";
-                if (key.EndsWith("слова")) return "слово";
-                if (key.EndsWith("предложения")) return "предложение";
-
-                // 🔥 Стандартные окончания существительных
                 var nounSuffixes = new[]
                 {
-            "ами", "ями", "ого", "его", "ому", "ему",
-            "ыми", "ими", "ах", "ях",
-            "ой", "ей", "ым", "им",
-            "ую", "юю", "ое", "ее", "ых", "их"
-        };
+                    "ами", "ями", "ого", "его", "ому", "ему",
+                    "ыми", "ими", "ах", "ях",
+                    "ой", "ей", "ым", "им",
+                    "ую", "юю", "ое", "ее", "ых", "их"
+                };
 
                 foreach (var suffix in nounSuffixes.OrderByDescending(s => s.Length))
                 {
@@ -122,95 +104,25 @@ namespace SemanticSearch.Application.AdditionalClasses
                         return key.Substring(0, key.Length - suffix.Length);
                 }
 
-                // 🔥 Окончания глаголов
+                // Окончания глаголов
                 var verbSuffixes = new[]
                 {
-            "ться", "тся", "ешь", "ёшь", "ет", "ёт",
-            "ем", "ём", "ете", "ёте", "ут", "ют", "ат", "ят",
-            "ла", "ло", "ли", "л"
-        };
+                    "ться", "тся", "ешь", "ёшь", "ет", "ёт",
+                    "ем", "ём", "ете", "ёте", "ут", "ют", "ат", "ят",
+                    "ла", "ло", "ли", "л"
+                };
 
                 foreach (var suffix in verbSuffixes.OrderByDescending(s => s.Length))
                 {
                     if (key.EndsWith(suffix) && key.Length > suffix.Length + 3)
                     {
                         var stem = key.Substring(0, key.Length - suffix.Length);
-                        // Добавляем инфинитивное окончание
                         return stem + "ть";
                     }
                 }
 
-                // Возвращаем как есть
                 return key;
             });
-        }
-        private string LemmatizeSafe(string word)
-            {
-                if (word.Length < 4)
-                    return word;
-
-                if (word.EndsWith("ция") || word.EndsWith("тие") || word.EndsWith("ние"))
-                    return word;
-
-                var suffixes = new[]
-                {
-                    "ами", "ями", "ого", "его", "ому", "ему",
-                    "ыми", "ими", "ой", "ей", "ым", "им",
-                    "ую", "юю", "ое", "ее", "ых", "их",
-                    "ах", "ях", "а", "я", "о", "е", "у", "ю", "ы", "и"
-                };
-
-            foreach (var suffix in suffixes.OrderByDescending(s => s.Length))
-            {
-                if (word.EndsWith(suffix) && word.Length > suffix.Length + 3)
-                {
-                    var stem = word.Substring(0, word.Length - suffix.Length);
-                    if (stem.Length >= 3)
-                        return stem;
-                }
-            }
-
-            return word;
-        }
-
-        // Упрощённый стемминг для русского языка
-        private string StemRussian(string word)
-        {
-            if (word.Length < 4)
-                return word;
-
-            // Пробуем отрезать известные суффиксы
-            foreach (var suffix in _russianSuffixes.OrderByDescending(s => s.Length))
-            {
-                if (word.EndsWith(suffix) && word.Length > suffix.Length + 2)
-                {
-                    var stem = word.Substring(0, word.Length - suffix.Length);
-
-                    // Минимальная длина корня
-                    if (stem.Length >= 3)
-                        return stem;
-                }
-            }
-
-            return word;
-        }
-
-        private bool IsValidLemma(string original, string lemma)
-        {
-            // Слишком короткий результат
-            if (lemma.Length < 3)
-                return false;
-
-            // Слишком большая разница в длине
-            if (Math.Abs(lemma.Length - original.Length) > 5)
-                return false;
-
-            // Подозрительные окончания
-            if (lemma.EndsWith("ть") && !original.EndsWith("ть") &&
-                !lemma.EndsWith("ать") && !lemma.EndsWith("ять") && !lemma.EndsWith("ить"))
-                return false;
-
-            return true;
         }
 
         public async Task<List<string>> ExpandQueryAsync(List<string> tokens)
@@ -239,7 +151,6 @@ namespace SemanticSearch.Application.AdditionalClasses
                             expanded.Add(syn.Word.ToLower());
                     }
 
-                    // Оригинал как фоллбэк
                     if (token.Length > 3)
                         expanded.Add(token.ToLower());
                 }

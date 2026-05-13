@@ -52,7 +52,7 @@ namespace SemanticSearch.Application.Services
                 if (!Directory.Exists(_modelPath))
                     throw new DirectoryNotFoundException($"Model directory not found: {_modelPath}");
 
-                // 1. Поиск ONNX модели
+                // Поиск ONNX модели
                 var onnxFile = FindModelFile();
                 if (string.IsNullOrEmpty(onnxFile))
                 {
@@ -63,7 +63,7 @@ namespace SemanticSearch.Application.Services
 
                 _logger.LogInformation($"Loading ONNX model: {onnxFile}");
 
-                // 2. Инициализация ONNX Runtime
+                // Инициализация ONNX Runtime
                 var sessionOptions = new SessionOptions
                 {
                     InterOpNumThreads = 1,
@@ -74,7 +74,7 @@ namespace SemanticSearch.Application.Services
                 _session = new InferenceSession(onnxFile, sessionOptions);
                 _logger.LogInformation("ONNX session created");
 
-                // 3. Инициализация простого токенизатора
+                // Инициализация простого токенизатора
                 _tokenizer = new SimpleTokenizer(_modelPath);
                 _logger.LogInformation("Tokenizer initialized");
 
@@ -94,13 +94,12 @@ namespace SemanticSearch.Application.Services
 
         private string? FindModelFile()
         {
-            // Приоритет: onnx/model.onnx > model.onnx в корне
             var candidates = new[]
             {
                 Path.Combine(_modelPath, "onnx", "model.onnx"),
                 Path.Combine(_modelPath, "model.onnx"),
                 Path.Combine(_modelPath, "onnx", "model_quantized.onnx"),
-                Path.Combine(_modelPath, "pytorch_model.bin") // fallback, но не поддерживается полностью
+                Path.Combine(_modelPath, "pytorch_model.bin")
             };
 
             return candidates.FirstOrDefault(File.Exists);
@@ -127,7 +126,7 @@ namespace SemanticSearch.Application.Services
                 return Array.Empty<float[]>();
 
             var results = new float[texts.Length][];
-            var batchSize = 4; // Консервативно для стабильности
+            var batchSize = 4;
 
             for (int i = 0; i < texts.Length; i += batchSize)
             {
@@ -145,6 +144,7 @@ namespace SemanticSearch.Application.Services
 
         private async Task<float[][]> ProcessBatchAsync(string[] texts)
         {
+            _logger.LogInformation($"Processing batch on Thread {Thread.CurrentThread.ManagedThreadId}");
             return await Task.Run(() =>
             {
                 if (_session == null || _tokenizer == null)
@@ -153,7 +153,7 @@ namespace SemanticSearch.Application.Services
                 // Токенизация
                 var encoded = _tokenizer.EncodeBatch(texts);
 
-                // 🔥 Создание тензоров с long вместо int
+                // Создание тензоров с long
                 var inputIdsTensor = CreateLongTensor(encoded.InputIds, encoded.MaxLength);
                 var attentionMaskTensor = CreateLongTensor(encoded.AttentionMask, encoded.MaxLength);
                 var tokenTypeIdsTensor = CreateLongTensor(encoded.TokenTypeIds, encoded.MaxLength);
@@ -189,23 +189,7 @@ namespace SemanticSearch.Application.Services
             {
                 for (int i = 0; i < values[b].Length && i < maxLength; i++)
                 {
-                    tensor[b, i] = values[b][i]; // Автоматическое преобразование int → long
-                }
-            }
-
-            return tensor;
-        }
-
-        // Старый метод можно удалить или оставить для совместимости
-        private DenseTensor<int> CreateTensor(int[][] values, int maxLength)
-        {
-            var tensor = new DenseTensor<int>(new[] { values.Length, maxLength });
-
-            for (int b = 0; b < values.Length; b++)
-            {
-                for (int i = 0; i < values[b].Length && i < maxLength; i++)
-                {
-                    tensor[b, i] = values[b][i];
+                    tensor[b, i] = values[b][i]; // Автоматическое преобразование int в long
                 }
             }
 
@@ -214,13 +198,11 @@ namespace SemanticSearch.Application.Services
 
         private float[][] ExtractEmbeddings(IDisposableReadOnlyCollection<DisposableNamedOnnxValue> results, int batchSize)
         {
-            // 1. Ищем выход по имени (стандартные имена экспорта SBERT)
             var output = results.FirstOrDefault(r =>
                 r.Name == "sentence_embedding" ||
                 r.Name == "last_hidden_state" ||
                 r.Name == "token_embeddings");
 
-            // 2. Если не нашли по имени, ищем первый валидный float-тензор
             if (output == null)
             {
                 foreach (var r in results)
@@ -241,7 +223,7 @@ namespace SemanticSearch.Application.Services
             if (output == null)
                 throw new InvalidOperationException("Could not find a valid output tensor in ONNX results.");
 
-            // 3. Получаем тензор и его размерности БЕЗОПАСНО
+            // тензор и его размерности
             var tensor = output.AsTensor<float>();
             var dims = tensor.Dimensions; // Теперь это работает корректно
 
@@ -287,7 +269,7 @@ namespace SemanticSearch.Application.Services
 
                 for (int s = 0; s < seqLen; s++)
                 {
-                    // Пропускаем паддинг токены (приблизительная эвристика)
+                    // Пропуск паддинг токенов (эвристика)
                     var firstHidden = tensor[b, s, 0];
                     if (firstHidden == 0 && s > 0)
                         continue;
@@ -347,7 +329,6 @@ namespace SemanticSearch.Application.Services
 
         private Dictionary<string, int>? LoadVocab(string modelPath)
         {
-            // Пробуем разные форматы словаря
             var vocabPaths = new[]
             {
                 Path.Combine(modelPath, "vocab.txt"),
@@ -369,7 +350,6 @@ namespace SemanticSearch.Application.Services
                 }
                 catch
                 {
-                    // Игнорируем ошибки загрузки, используем fallback
                 }
             }
 
@@ -381,7 +361,7 @@ namespace SemanticSearch.Application.Services
             var vocab = new Dictionary<string, int>();
             var lines = File.ReadAllLines(path);
 
-            for (int i = 0; i < lines.Length && i < 30000; i++) // Ограничиваем размер
+            for (int i = 0; i < lines.Length && i < 30000; i++)
             {
                 var token = lines[i].Trim();
                 if (!string.IsNullOrEmpty(token))
@@ -421,7 +401,6 @@ namespace SemanticSearch.Application.Services
             vocab["[SEP]"] = 102;
             vocab["[MASK]"] = 103;
 
-            // Частые русские токены (упрощённо)
             var commonRu = new[] { "а", "и", "в", "не", "на", "с", "к", "по", "что", "как",
                                    "это", "тот", "быть", "он", "она", "оно", "мы", "вы", "они",
                                    "токен", "текст", "слово", "модель", "нейрон", "сеть", "данные" };
@@ -476,10 +455,10 @@ namespace SemanticSearch.Application.Services
                     Array.Resize(ref attentionMask[b], maxLength);
                     Array.Resize(ref tokenTypeIds[b], maxLength);
 
-                    // Заполняем паддингом
+                    // заполнение паддингом
                     for (int i = inputIds[b].Length - (maxLength - inputIds[b].Where(x => x != 0).Count()); i < maxLength; i++)
                     {
-                        if (inputIds[b][i] == 0) // Не перезаписываем реальные токены
+                        if (inputIds[b][i] == 0)
                         {
                             inputIds[b][i] = _padTokenId;
                             attentionMask[b][i] = 0;
@@ -497,10 +476,9 @@ namespace SemanticSearch.Application.Services
                 return Array.Empty<string>();
 
             // Базовая токенизация: по пробелам и знакам препинания
-            // Для продакшена лучше использовать настоящий WordPiece токенизатор
             return Regex.Split(text.ToLowerInvariant(), @"[\s\p{P}]+")
                 .Where(t => !string.IsNullOrWhiteSpace(t))
-                .Take(_maxSequenceLength - 2) // -2 для [CLS] и [SEP]
+                .Take(_maxSequenceLength - 2)
                 .ToArray();
         }
 

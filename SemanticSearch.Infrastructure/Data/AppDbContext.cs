@@ -11,7 +11,7 @@ namespace SemanticSearch.Infrastructure.Data
     public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
+        public AppDbContext() : base() { } // for testing
         public DbSet<Document> Documents { get; set; }
         public DbSet<Paragraph> Paragraphs { get; set; }
         public DbSet<ParagraphVector> ParagraphVectors { get; set; }
