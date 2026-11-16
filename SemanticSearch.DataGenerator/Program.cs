@@ -7,7 +7,7 @@ using System.Text;
 
 namespace SemanticSearch.DataGenerator
 {
-    // 🔥 Вспомогательные классы для данных (чтобы избежать ошибок кортежей)
+    // Вспомогательные классы для данных (чтобы избежать ошибок кортежей)
     class AiTopic
     {
         public string Name { get; set; } = string.Empty;

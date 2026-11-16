@@ -3,8 +3,7 @@
     ViewData["Title"] = "Search results";
 }
 
-<div class="container mt-4">
-    <!-- Хлебные крошки -->
+<div class="container mt-4" id="results-container" data-query="@Model.Query">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a asp-action="Index">Search</a></li>
@@ -13,15 +12,18 @@
     </nav>
 
     <div class="card mb-4">
-        <div class="card-body bg-light">
-            <h4>Search results for: "<span class="text-primary">@Model.Query</span>"</h4>
-            <div class="row text-muted small">
-                <div class="col">Algorithm: <span class="badge bg-secondary">@Model.AlgorithmUsed</span></div>
-                <div class="col">Time: <span class="badge bg-info">@Model.TotalTimeMs ms</span></div>
-                <div class="col">Founded: @Model.TotalResults paragraphs</div>
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h4 class="mb-0">Search results for: "<span class="query-highlight">@Model.Query</span>"</h4>
+                <a asp-action="Index" class="btn btn-sm btn-back">← New search</a>
+            </div>
+            <div class="row meta-row small">
+                <div class="col">Algorithm: <span class="badge badge-meta">@Model.AlgorithmUsed</span></div>
+                <div class="col">Time: <span class="badge badge-meta">@Model.TotalTimeMs ms</span></div>
+                <div class="col">Found: @Model.TotalResults results</div>
                 @if (Model.FromCache)
                 {
-                    <div class="col text-warning">From cache</div>
+                    <div class="col">From cache</div>
                 }
             </div>
         </div>
@@ -29,30 +31,64 @@
 
     @if (!Model.Matches.Any())
     {
-        <div class="alert alert-warning text-center p-5">
-            <h5> Ничего не найдено</h5>
-            <p>Try changing the query wording or using a different algorithm..</p>
+        <div class="alert alert-empty text-center p-5">
+            <h5>Nothing found</h5>
+            <p>Try changing the query wording or using a different algorithm.</p>
         </div>
     }
     else
     {
         @foreach (var match in Model.Matches)
         {
-            <div class="card mb-3 shadow-sm border-start border-primary border-4">
+            var sourceLabel = match.SourceName switch
+            {
+                "openalex" => "OpenAlex",
+                "semanticscholar" => "Semantic Scholar",
+                _ => null
+            };
+
+            <div class="card mb-3 result-card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <h5 class="card-title text-primary">@match.DocumentTitle</h5>
-                        <span class="badge bg-success fs-6">@match.RelevanceScore%</span>
+                        <div>
+                            <h5 class="card-title mb-1">@match.DocumentTitle</h5>
+                            @if (sourceLabel != null)
+                            {
+                                <span class="badge source-badge">from @sourceLabel</span>
+                            }
+                            else
+                            {
+                                <span class="badge source-badge source-local">@match.SourceType</span>
+                            }
+                            @if (!string.IsNullOrEmpty(match.SourceUrl))
+                            {
+                                <a href="@match.SourceUrl" target="_blank" rel="noopener" class="source-link ms-2">Source ↗</a>
+                            }
+                        </div>
+                        <span class="badge score-badge">@match.RelevanceScore%</span>
                     </div>
+                    @if (!string.IsNullOrEmpty(match.Authors) || !string.IsNullOrEmpty(match.PublicationDate) || match.CitationCount.HasValue)
+                    {
+                        <div class="small text-muted-soft mt-1 mb-2">
+                            @if (!string.IsNullOrEmpty(match.PublicationDate))
+                            {
+                                <span>@match.PublicationDate.Substring(0, 4)</span>
+                            }
+                            @if (!string.IsNullOrEmpty(match.Authors))
+                            {
+                                <span> · @match.Authors</span>
+                            }
+                            @if (match.CitationCount.HasValue)
+                            {
+                                <span class="citation-count"> · cited by @match.CitationCount</span>
+                            }
+                        </div>
+                    }
+                    <p class="card-text result-text" style="white-space: pre-wrap;">@match.ParagraphContent</p>
 
-                    <p class="card-text fs-5" style="white-space: pre-wrap;">@match.ParagraphContent</p>
-
-                    <!-- Детализация оценки (Debug info) -->
-                    <div class="mt-3 pt-2 border-top">
-                        <div class="row text-center mt-1 small text-muted">
-                            <div class="col">
-                                Vector: <b>@match.VectorScore%</b>
-                            </div>
+                    <div class="mt-3 pt-2 card-footer-meta">
+                        <div class="row text-center mt-1 small">
+                            <div class="col">Vector: <b>@match.VectorScore%</b></div>
                         </div>
                     </div>
                 </div>

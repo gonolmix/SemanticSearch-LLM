@@ -1,0 +1,200 @@
+﻿/* =====================================================
+   SemanticSearch-LLM theme: Navy + Burgundy + White
+   ===================================================== */
+:root {
+    --ss-navy-950: #060F1D;
+    --ss-navy-900: #0A1930;
+    --ss-navy-800: #102647;
+    --ss-navy-700: #16335E;
+    --ss-burgundy-600: #8C1D33;
+    --ss-burgundy-500: #A62645;
+    --ss-white: #F5F7FA;
+    --ss-muted: #A9B7CC;
+    --ss-border: rgba(245, 247, 250, 0.12);
+}
+
+body {
+    background: linear-gradient(180deg, var(--ss-navy-950) 0%, var(--ss-navy-900) 100%);
+    color: var(--ss-white);
+    min-height: 100vh;
+}
+
+a {
+    color: #9DC0F0;
+}
+
+    a:hover {
+        color: var(--ss-white);
+    }
+
+/* Навигация */
+.navbar {
+    background-color: var(--ss-navy-800) !important;
+    border-bottom: 2px solid var(--ss-burgundy-600);
+}
+
+.navbar-brand, .nav-link {
+    color: var(--ss-white) !important;
+}
+
+    .nav-link:hover {
+        color: var(--ss-burgundy-500) !important;
+    }
+
+/* Мета-информация */
+.breadcrumb a {
+    color: var(--ss-muted);
+}
+
+.meta-row {
+    color: var(--ss-muted);
+}
+
+.badge-meta {
+    background-color: var(--ss-navy-700);
+    color: var(--ss-white);
+}
+
+.query-highlight {
+    color: var(--ss-burgundy-500);
+    font-weight: 600;
+}
+
+/* Карточки */
+.card {
+    background-color: var(--ss-navy-800);
+    border: 1px solid var(--ss-border);
+    color: var(--ss-white);
+}
+
+.result-card {
+    border-left: 4px solid var(--ss-burgundy-600);
+}
+
+.card-title {
+    color: var(--ss-white);
+}
+
+/* Бейджи */
+.score-badge {
+    background-color: var(--ss-burgundy-600);
+    color: var(--ss-white);
+    font-size: 1rem;
+}
+
+.source-badge {
+    background: transparent;
+    border: 1px solid var(--ss-burgundy-500);
+    color: var(--ss-burgundy-500);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.source-local {
+    border-color: var(--ss-muted);
+    color: var(--ss-muted);
+}
+
+.source-link {
+    color: var(--ss-muted);
+    font-size: .85rem;
+}
+
+    .source-link:hover {
+        color: var(--ss-burgundy-500);
+    }
+
+/* Текст результата и подсветка запроса */
+.result-text {
+    color: var(--ss-white);
+}
+
+mark {
+    background-color: var(--ss-burgundy-600);
+    color: var(--ss-white);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.card-footer-meta {
+    border-top: 1px solid var(--ss-border);
+    color: var(--ss-muted);
+}
+
+/* Пустой результат */
+.alert-empty {
+    background-color: var(--ss-navy-800);
+    border: 1px dashed var(--ss-burgundy-500);
+    color: var(--ss-muted);
+}
+
+/* Формы поиска */
+.form-control, .form-select {
+    background-color: var(--ss-navy-700);
+    border: 1px solid var(--ss-border);
+    color: var(--ss-white);
+}
+
+    .form-control:focus, .form-select:focus {
+        background-color: var(--ss-navy-700);
+        color: var(--ss-white);
+        border-color: var(--ss-burgundy-500);
+        box-shadow: 0 0 0 .2rem rgba(166, 38, 69, .25);
+    }
+
+.btn-primary {
+    background-color: var(--ss-burgundy-600);
+    border-color: var(--ss-burgundy-600);
+}
+
+    .btn-primary:hover {
+        background-color: var(--ss-burgundy-500);
+        border-color: var(--ss-burgundy-500);
+    }
+
+/* Кнопка "Show more" (из site.js) */
+.toggle-abstract {
+    color: var(--ss-burgundy-500);
+    cursor: pointer;
+    font-size: .85rem;
+    user-select: none;
+}
+
+.text-muted-soft {
+    color: var(--ss-muted);
+}
+
+.citation-count {
+    color: var(--ss-burgundy-500);
+}
+
+.btn-back {
+    border: 1px solid var(--ss-burgundy-500);
+    color: var(--ss-burgundy-500);
+    background: transparent;
+}
+
+    .btn-back:hover {
+        background: var(--ss-burgundy-600);
+        color: var(--ss-white);
+    }
+
+.form-check-label {
+    color: var(--ss-white);
+}
+
+.form-switch .form-check-input {
+    background-color: var(--ss-navy-700);
+    border-color: var(--ss-border);
+}
+
+    .form-switch .form-check-input:checked {
+        background-color: var(--ss-burgundy-600);
+        border-color: var(--ss-burgundy-600);
+    }
+
+.brand-sub {
+    color: var(--ss-muted);
+    font-size: .75rem;
+    margin-left: .5rem;
+}

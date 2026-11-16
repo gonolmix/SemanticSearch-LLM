@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using SemanticSearch.Application.AdditionalClasses;
 using SemanticSearch.Application.Interfaces;
 using SemanticSearch.Application.Services;
+using SemanticSearch.Application.ExternalSources;   // ? ДОБАВЛЕНО
 using SemanticSearch.Infrastructure.Data;
 using SemanticSearch.Infrastructure.Repositories;
 using SemanticSearch.Infrastructure.VectorStore;
@@ -40,7 +41,7 @@ namespace SemanticSearch.Web
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequiredLength = 6;
             })
-            .AddEntityFrameworkStores<ApplicationDbContext>() 
+            .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
             // Memory Cache
@@ -52,6 +53,7 @@ namespace SemanticSearch.Web
             builder.Services.AddScoped<LinguisticRepository>();
             builder.Services.AddScoped<ParagraphRepository>();
             builder.Services.AddScoped<VectorRepository>();
+            builder.Services.AddScoped<DocumentRepository>();        // ? ДОБАВЛЕНО (нужен DocumentService)
 
             // Векторное хранилище
             builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>();
@@ -60,6 +62,32 @@ namespace SemanticSearch.Web
             builder.Services.AddScoped<ILinguisticService, LinguisticService>();
             builder.Services.AddScoped<ISynonymApiService, SynonymApiService>();
             builder.Services.AddScoped<IRankingService, RankingService>();
+            builder.Services.AddScoped<IDocumentService, DocumentService>();   // ? ДОБАВЛЕНО
+
+            // ============================================================
+            // ИНТЕГРАЦИЯ ВНЕШНИХ НАУЧНЫХ БАЗ (OpenAlex + Semantic Scholar)
+            // ============================================================
+
+            // HTTP-клиенты с базовыми адресами
+            builder.Services.AddHttpClient("openalex", client =>
+            {
+                client.BaseAddress = new Uri("https://api.openalex.org/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            builder.Services.AddHttpClient("semanticscholar", client =>
+            {
+                client.BaseAddress = new Uri("https://api.semanticscholar.org/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            // Клиенты источников (оба попадут в IEnumerable<IScholarlySourceClient>)
+            builder.Services.AddScoped<IScholarlySourceClient, OpenAlexClient>();
+            builder.Services.AddScoped<IScholarlySourceClient, SemanticScholarClient>();
+
+            // Сервис импорта: источники ? Document/Paragraph ? вектора
+            builder.Services.AddScoped<ScholarlyImportService>();
+            // ============================================================
 
             // Embedding Service
             var modelPath = Path.Combine(builder.Environment.ContentRootPath, "ml-models", "all-minilm-l6-v2");
@@ -68,8 +96,6 @@ namespace SemanticSearch.Web
 
             // Главный сервис поиска
             builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
-            
-
 
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
@@ -78,9 +104,6 @@ namespace SemanticSearch.Web
                     options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
                 });
             var app = builder.Build();
-
-            // Инициализация при старте (Ленивая загрузка модели)
-            // Модель загрузится только при первом запросе поиска, чтобы не тормозить старт
 
             using (var scope = app.Services.CreateScope())
             {
@@ -105,7 +128,7 @@ namespace SemanticSearch.Web
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Search}/{action=Index}/{id?}");
-            
+
             app.MapControllers();
 
             using (var scope = app.Services.CreateScope())
@@ -114,17 +137,9 @@ namespace SemanticSearch.Web
                 var searchService = scope.ServiceProvider.GetRequiredService<ISemanticSearchService>();
                 var linguisticService = scope.ServiceProvider.GetRequiredService<ILinguisticService>();
 
-                // лингвистические данные
                 await linguisticService.LoadDataAsync();
-
-                //_logger.LogInformation("Pre-loading embedding model...");
                 await embeddingService.InitializeAsync();
-
-                // Индексируются все абзацы
-                //_logger.LogInformation("Pre-indexing paragraphs...");
                 await searchService.IndexPendingParagraphsAsync();
-
-                //_logger.LogInformation("All services pre-loaded and ready!");
             }
 
             app.Run();
