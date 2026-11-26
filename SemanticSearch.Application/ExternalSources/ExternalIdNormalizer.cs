@@ -21,6 +21,10 @@ namespace SemanticSearch.Application.ExternalSources
                 id = "arxiv:" + id["https://arxiv.org/abs/".Length..];
             else if (id.StartsWith("https://arxiv.org/pdf/", StringComparison.OrdinalIgnoreCase))
                 id = "arxiv:" + id["https://arxiv.org/pdf/".Length..];
+            else if (id.StartsWith("PMC", StringComparison.OrdinalIgnoreCase))
+                id = "pmc:" + id["PMC".Length..];
+            else if (id.StartsWith("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC", StringComparison.OrdinalIgnoreCase))
+                id = "pmc:" + id["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC".Length..];
 
             return id.ToLowerInvariant().Trim();
         }

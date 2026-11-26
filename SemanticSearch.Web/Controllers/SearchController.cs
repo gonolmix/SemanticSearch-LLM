@@ -13,7 +13,6 @@ namespace SemanticSearch.Web.Controllers
         private readonly ScholarlyImportService _importService;
         private readonly ILogger<SearchController> _logger;
 
-        // Question-слова, которые мешают API-поиску — вырежем перед импортом
         private static readonly HashSet<string> QuestionWords = new(StringComparer.OrdinalIgnoreCase)
         {
             "how", "what", "why", "when", "where", "who", "which", "whose", "whom",
@@ -58,12 +57,11 @@ namespace SemanticSearch.Web.Controllers
 
 
 
-                // 1. LIVE-ИМПОРТ: если включён и выбраны какие-то API — идём в сеть
                 if (liveImport)
                 {
                     var apiSources = sources?
                         .Where(s => s != "local" &&
-                                   (s == "openalex" || s == "semanticscholar"))
+                                   (s == "openalex" || s == "semanticscholar" || s == "arxiv" || s == "europepmc" || s == "core"))
                         .ToList() ?? new List<string>();
 
                     if (apiSources.Any())
@@ -76,7 +74,7 @@ namespace SemanticSearch.Web.Controllers
                         await _importService.ImportAsync(
                             simplifiedQuery,
                             apiSources,
-                            takePerSource: 5,
+                            takePerSource: 10,
                             HttpContext.RequestAborted);
                     }
                 }
@@ -87,7 +85,7 @@ namespace SemanticSearch.Web.Controllers
                     TopK = 10,
                     UseCache = false,
                     LogQuery = true,
-                    SourceFilter = sources is { Length: > 0 } ? sources : null   // ← ДОБАВЛЕНО
+                    SourceFilter = sources is { Length: > 0 } ? sources : null  
                 };
                 // 2. Поиск по локальной БД (включающий только что импортированное)
                 var response = await _searchService.SearchAsync(request);
@@ -113,7 +111,7 @@ namespace SemanticSearch.Web.Controllers
                 .Where(w => w.Length > 2 && !QuestionWords.Contains(w))
                 .ToList();
 
-            // Если ничего не осталось — возвращаем исходный запрос (обрезать до 60 символов)
+            // Если ничего не осталось — возвращение исходного запроса (обрезать до 60 символов)
             return words.Any() ? string.Join(" ", words) : query.Trim().Substring(0, Math.Min(query.Length, 60));
         }
     }

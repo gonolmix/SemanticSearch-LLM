@@ -64,10 +64,6 @@ namespace SemanticSearch.Web
             builder.Services.AddScoped<IRankingService, RankingService>();
             builder.Services.AddScoped<IDocumentService, DocumentService>();   // ? ДОБАВЛЕНО
 
-            // ============================================================
-            // ИНТЕГРАЦИЯ ВНЕШНИХ НАУЧНЫХ БАЗ (OpenAlex + Semantic Scholar)
-            // ============================================================
-
             // HTTP-клиенты с базовыми адресами
             builder.Services.AddHttpClient("openalex", client =>
             {
@@ -81,9 +77,30 @@ namespace SemanticSearch.Web
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
 
+            builder.Services.AddHttpClient("arxiv", client =>
+            {
+                client.BaseAddress = new Uri("https://export.arxiv.org/");
+                client.Timeout = TimeSpan.FromSeconds(60);
+            });
+
+            builder.Services.AddHttpClient("europepmc", client =>
+            {
+                client.BaseAddress = new Uri("https://www.ebi.ac.uk/europepmc/webservices/rest/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            builder.Services.AddHttpClient("core", client =>
+            {
+                client.BaseAddress = new Uri("https://api.core.ac.uk/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
             // Клиенты источников (оба попадут в IEnumerable<IScholarlySourceClient>)
             builder.Services.AddScoped<IScholarlySourceClient, OpenAlexClient>();
             builder.Services.AddScoped<IScholarlySourceClient, SemanticScholarClient>();
+            builder.Services.AddScoped<IScholarlySourceClient, ArxivClient>();
+            builder.Services.AddScoped<IScholarlySourceClient, EuropePmcClient>();
+            builder.Services.AddScoped<IScholarlySourceClient, CoreClient>();
 
             // Сервис импорта: источники ? Document/Paragraph ? вектора
             builder.Services.AddScoped<ScholarlyImportService>();
