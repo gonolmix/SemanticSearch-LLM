@@ -1,8 +1,11 @@
 ﻿(function () {
     "use strict";
 
+    // Защита на уровне файла: второй <script> не зарегистрирует второй обработчик
+    if (window.__ssSiteJsLoaded) return;
+    window.__ssSiteJsLoaded = true;
+
     document.addEventListener("DOMContentLoaded", function () {
-        if (window.__ssSiteJsLoaded) return;
         collapseLongAbstracts(700);
         highlightQueryWords();
         animateCards();
@@ -17,7 +20,6 @@
             .filter(function (w) { return w.length > 3; });
     }
 
-    // Подсветка слов запроса в тексте результата
     function highlightElement(p, words) {
         var html = escapeHtml(p.textContent);
         words.forEach(function (w) {
@@ -36,26 +38,27 @@
         });
     }
 
-    // Сворачивание длинных аннотаций
     function collapseLongAbstracts(limit) {
         var container = document.getElementById("results-container");
         if (!container) return;
         var words = wordsOf(container.dataset.query);
 
         container.querySelectorAll(".result-text").forEach(function (p) {
-            if (p.dataset.full) return; 
+            if (p.dataset.collapsed === "1") return;   // идемпотентность: уже свёрнут — не трогаем
             var full = p.textContent;
             if (full.length <= limit) return;
 
             var short = full.slice(0, limit).trimEnd() + "…";
             p.textContent = short;
+            p.dataset.collapsed = "1";                 // помечаем параграф
+            p.dataset.full = full;                     // запоминаем оригинал
 
             var btn = document.createElement("span");
             btn.className = "toggle-abstract ms-2";
             btn.textContent = "Show more ▾";
             btn.addEventListener("click", function () {
                 var expanded = btn.dataset.expanded === "1";
-                p.textContent = expanded ? short : full;
+                p.textContent = expanded ? short : p.dataset.full;
                 highlightElement(p, words);
                 btn.textContent = expanded ? "Show more ▾" : "Collapse ▴";
                 btn.dataset.expanded = expanded ? "0" : "1";
@@ -64,7 +67,6 @@
         });
     }
 
-    // Плавное появление карточек
     function animateCards() {
         document.querySelectorAll(".result-card").forEach(function (card, i) {
             card.style.opacity = "0";

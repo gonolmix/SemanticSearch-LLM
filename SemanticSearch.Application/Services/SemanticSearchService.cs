@@ -359,31 +359,37 @@ namespace SemanticSearch.Application.Services
                 using var doc = System.Text.Json.JsonDocument.Parse(metadata);
                 var root = doc.RootElement;
 
-                var source = root.TryGetProperty("source", out var s) ? s.GetString() : null;
-
-                // ← ДОБАВЬТЕ ЭТУ СТРОКУ
-                Console.WriteLine($"[ParseMetadata] metadata='{metadata}', extracted source='{source}'");
+                string? source = null;
+                if (root.TryGetProperty("source", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String)
+                    source = s.GetString();
 
                 string? authors = null;
                 if (root.TryGetProperty("authors", out var a) && a.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
                     var list = a.EnumerateArray()
+                        .Where(x => x.ValueKind == System.Text.Json.JsonValueKind.String)
                         .Select(x => x.GetString())
                         .Where(x => !string.IsNullOrWhiteSpace(x))
                         .ToList();
                     authors = list.Count > 3
                         ? string.Join(", ", list.Take(3)) + " et al."
                         : string.Join(", ", list);
+                    if (string.IsNullOrWhiteSpace(authors)) authors = null;
                 }
 
-                var date = root.TryGetProperty("publication_date", out var d) ? d.GetString() : null;
-                int? citations = root.TryGetProperty("citation_count", out var c) && c.TryGetInt32(out var cv) ? cv : null;
+                string? date = null;
+                if (root.TryGetProperty("publication_date", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String)
+                    date = d.GetString();
+
+                // БЕЗОПАСНО: сначала проверяем Kind, только потом читаем число
+                int? citations = null;
+                if (root.TryGetProperty("citation_count", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    citations = c.GetInt32();
 
                 return (source, authors, date, citations);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[ParseMetadata] ERROR: {ex.Message}");
                 return (null, null, null, null);
             }
         }
