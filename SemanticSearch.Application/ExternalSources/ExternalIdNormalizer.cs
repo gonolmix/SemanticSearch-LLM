@@ -19,14 +19,27 @@ namespace SemanticSearch.Application.ExternalSources
                 id = "openalex:" + id["https://openalex.org/".Length..];
             else if (id.StartsWith("https://arxiv.org/abs/", StringComparison.OrdinalIgnoreCase))
                 id = "arxiv:" + id["https://arxiv.org/abs/".Length..];
+            else if (id.StartsWith("http://arxiv.org/abs/", StringComparison.OrdinalIgnoreCase))   // ← arXiv Atom отдаёт http
+                id = "arxiv:" + id["http://arxiv.org/abs/".Length..];
             else if (id.StartsWith("https://arxiv.org/pdf/", StringComparison.OrdinalIgnoreCase))
                 id = "arxiv:" + id["https://arxiv.org/pdf/".Length..];
-            else if (id.StartsWith("PMC", StringComparison.OrdinalIgnoreCase))
-                id = "pmc:" + id["PMC".Length..];
+            else if (id.StartsWith("http://arxiv.org/pdf/", StringComparison.OrdinalIgnoreCase))
+                id = "arxiv:" + id["http://arxiv.org/pdf/".Length..];
             else if (id.StartsWith("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC", StringComparison.OrdinalIgnoreCase))
                 id = "pmc:" + id["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC".Length..];
+            else if (id.StartsWith("PMC", StringComparison.OrdinalIgnoreCase))
+                id = "pmc:" + id["PMC".Length..];
 
-            return id.ToLowerInvariant().Trim();
+            id = id.ToLowerInvariant().Trim();
+
+            if (id.StartsWith("arxiv:", StringComparison.OrdinalIgnoreCase))
+            {
+                var vIdx = id.LastIndexOf('v');
+                if (vIdx > 6 && int.TryParse(id[(vIdx + 1)..], out _))
+                    id = id[..vIdx];
+            }
+
+            return id;
         }
 
         /// Часть id без префикса источника — для сопоставления с URL-формой в старых метаданных

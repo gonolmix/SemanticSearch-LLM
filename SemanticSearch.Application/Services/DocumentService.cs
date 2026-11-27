@@ -38,7 +38,7 @@ namespace SemanticSearch.Application.Services
                 Description = dto.Description,
                 SourceUrl = dto.SourceUrl,
                 SourceType = dto.SourceType,
-                Metadata = dto.Paragraphs.Any() ? $"{{\"initial_paragraphs\":{dto.Paragraphs.Count}}}" : null
+                Metadata = dto.Metadata  // ← используем переданный Metadata
             };
 
             var created = await _docRepo.AddAsync(doc);

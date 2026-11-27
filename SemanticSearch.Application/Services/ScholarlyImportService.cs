@@ -4,6 +4,7 @@ using SemanticSearch.Application.ExternalSources;
 using SemanticSearch.Application.Interfaces;
 using SemanticSearch.Core.DTO;
 using SemanticSearch.Infrastructure.Data;
+using System.Text.Json;
 
 namespace SemanticSearch.Application.Services
 {
@@ -58,6 +59,7 @@ namespace SemanticSearch.Application.Services
                 try
                 {
                     works = await client.SearchAsync(query, takePerSource, cancellationToken);
+                    _logger.LogInformation("Received {Count} works from {Source}", works.Count, client.SourceName);
                 }
                 catch (Exception ex)
                 {
@@ -78,14 +80,13 @@ namespace SemanticSearch.Application.Services
                         {
                             report.Imported++;
                             _logger.LogInformation(
-                                "Imported [{Source}] {Title} (DocumentId: {Id})",
+                                "Imported [{Source}] '{Title}' (DocumentId: {Id})",
                                 work.Source, work.Title, result.DocumentId);
                         }
                         else
                         {
                             report.Skipped++;
                             report.Errors.Add($"{work.Source} '{work.Title}': {result.ErrorMessage}");
-                            // ← ГЛАВНОЕ НОВОЕ: причина пропуска теперь видна в консоли
                             _logger.LogWarning(
                                 "SKIPPED [{Source}] '{Title}': {Reason}",
                                 work.Source, work.Title, result.ErrorMessage);
@@ -101,7 +102,6 @@ namespace SemanticSearch.Application.Services
             }
 
             report.CompletedAt = DateTime.UtcNow;
-            // ← Итоговая сводка в лог
             _logger.LogInformation(
                 "Import report: query='{Query}' imported={Imported} skipped={Skipped} errors=[{Errors}]",
                 query, report.Imported, report.Skipped, string.Join(" | ", report.Errors));
@@ -113,39 +113,66 @@ namespace SemanticSearch.Application.Services
             ScholarlyWork work,
             CancellationToken cancellationToken)
         {
+            // 1. Проверяем наличие текста
             var text = work.FullText ?? work.Abstract;
-
             if (string.IsNullOrWhiteSpace(text))
                 return ImportResult.Fail("no abstract/fulltext in source record");
 
+            // 2. Проверяем дубликат
             if (await IsDuplicateAsync(work.ExternalId, cancellationToken))
                 return ImportResult.Fail($"duplicate detected (externalId='{work.ExternalId}')");
 
+            // 3. Создаём документ с Metadata сразу
+            var metadata = work.BuildMetadata();
             var documentDto = new DocumentDto
             {
                 Title = Truncate(work.Title, 500),
                 Description = Truncate(work.Abstract, 4000),
                 SourceUrl = Truncate(work.SourceUrl, 1000),
-                SourceType = "api"
+                SourceType = "api",
+                Metadata = metadata  // передаём Metadata сразу
             };
 
-            var createdDoc = await _documentService.CreateDocumentAsync(documentDto);
-
-            var entity = await _dbContext.Documents
-                .FirstOrDefaultAsync(d => d.Id == createdDoc.Id, cancellationToken);
-            if (entity != null)
+            DocumentDto createdDoc;
+            try
             {
-                entity.Metadata = work.BuildMetadata();
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                createdDoc = await _documentService.CreateDocumentAsync(documentDto);
+            }
+            catch (Exception ex)
+            {
+                return ImportResult.Fail($"failed to create document: {ex.Message}");
             }
 
-            await _documentService.ImportFromTextAsync(createdDoc.Id, text, maxParagraphLength: 1500);
-
-            var paragraphs = await _documentService.GetParagraphsByDocumentAsync(createdDoc.Id);
-            var paragraphIds = paragraphs.Select(p => p.Id).ToList();
-            if (paragraphIds.Any())
+            // 4. Импортируем текст в параграфы
+            try
             {
-                await _documentService.BulkIndexParagraphsAsync(paragraphIds);
+                await _documentService.ImportFromTextAsync(createdDoc.Id, text, maxParagraphLength: 1500);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to import text for document {Id}", createdDoc.Id);
+                // Откатываем создание документа
+                await _documentService.DeleteDocumentAsync(createdDoc.Id);
+                return ImportResult.Fail($"failed to import text: {ex.Message}");
+            }
+
+            // 5. Индексируем параграфы
+            try
+            {
+                var paragraphs = await _documentService.GetParagraphsByDocumentAsync(createdDoc.Id);
+                var paragraphIds = paragraphs.Select(p => p.Id).ToList();
+
+                if (paragraphIds.Any())
+                {
+                    var indexedCount = await _documentService.BulkIndexParagraphsAsync(paragraphIds);
+                    _logger.LogDebug("Indexed {Count} paragraphs for document {Id}", indexedCount, createdDoc.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to index paragraphs for document {Id}", createdDoc.Id);
+                // Документ и параграфы уже созданы, просто логируем ошибку индексации
+                // Не откатываем, так как параграфы можно переиндексировать позже
             }
 
             return ImportResult.Ok(createdDoc.Id);
@@ -154,19 +181,28 @@ namespace SemanticSearch.Application.Services
         private async Task<bool> IsDuplicateAsync(string externalId, CancellationToken cancellationToken)
         {
             var normalized = ExternalIdNormalizer.Normalize(externalId);
-            if (normalized.Length < 8)
+            if (string.IsNullOrWhiteSpace(normalized) || normalized.Length < 8)
                 return false;
 
             var tail = ExternalIdNormalizer.RawTail(normalized);
-            if (tail.Length < 8)
+            if (string.IsNullOrWhiteSpace(tail) || tail.Length < 8)
                 return false;
 
-            return await _dbContext.Documents.AnyAsync(d => d.Metadata != null && (
-                   d.Metadata.Contains($":\"{normalized}\"") ||   // новое поле nid или нормализованный external_id
-                   d.Metadata.Contains($"\"{normalized}\"") ||   // id в кавычках как есть
-                   d.Metadata.Contains($"/{tail}\"")),            // старая URL-форма: https://doi.org/... или https://openalex.org/...
+            // Проверяем точное совпадение нормализованного ID в Metadata
+            return await _dbContext.Documents.AnyAsync(d =>
+                d.Metadata != null &&
+                d.SourceType == "api" &&
+                (
+                    // Точное совпадение нормализованного ID
+                    d.Metadata.Contains($"\"nid\":\"{normalized}\"") ||
+                    // Совпадение по external_id
+                    d.Metadata.Contains($"\"external_id\":\"{normalized}\"") ||
+                    // Совпадение по tail (для URL-форм)
+                    d.Metadata.Contains($"/{tail}\"")
+                ),
                 cancellationToken);
         }
+
         private static string? Truncate(string? value, int maxLength)
         {
             if (string.IsNullOrEmpty(value)) return value;

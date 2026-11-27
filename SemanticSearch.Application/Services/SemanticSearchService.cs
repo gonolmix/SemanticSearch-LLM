@@ -361,6 +361,9 @@ namespace SemanticSearch.Application.Services
 
                 var source = root.TryGetProperty("source", out var s) ? s.GetString() : null;
 
+                // ← ДОБАВЬТЕ ЭТУ СТРОКУ
+                Console.WriteLine($"[ParseMetadata] metadata='{metadata}', extracted source='{source}'");
+
                 string? authors = null;
                 if (root.TryGetProperty("authors", out var a) && a.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
@@ -378,8 +381,9 @@ namespace SemanticSearch.Application.Services
 
                 return (source, authors, date, citations);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[ParseMetadata] ERROR: {ex.Message}");
                 return (null, null, null, null);
             }
         }
