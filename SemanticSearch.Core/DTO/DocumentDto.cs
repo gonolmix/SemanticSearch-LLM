@@ -23,6 +23,7 @@ namespace SemanticSearch.Core.DTO
         public int ParagraphCount { get; set; }
 
         public bool IsIndexed { get; set; }
+        public string? Metadata { get; set; }
 
         public List<ParagraphDto> Paragraphs { get; set; } = new List<ParagraphDto>();
     }

@@ -20,5 +20,6 @@ namespace SemanticSearch.Core.DTO
         public bool UseCache { get; set; } = true;
 
         public bool LogQuery { get; set; } = true;
+        public IReadOnlyCollection<string>? SourceFilter { get; set; }
     }
 }

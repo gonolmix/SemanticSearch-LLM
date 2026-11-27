@@ -160,11 +160,11 @@ namespace SemanticSearch.Application.Services
 
                 // Подготовка входов для ONNX
                 var inputs = new List<NamedOnnxValue>
-        {
-            NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
-            NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor),
-            NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIdsTensor)
-        };
+                {
+                    NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
+                    NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor),
+                    NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIdsTensor)
+                };
 
                 // Инференс
                 using var results = _session.Run(inputs);

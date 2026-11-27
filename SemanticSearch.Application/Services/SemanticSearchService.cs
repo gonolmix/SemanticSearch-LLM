@@ -110,6 +110,7 @@ namespace SemanticSearch.Application.Services
             var paragraphs = await _paragraphRepo.GetAllWithVectorsAsync();
             var activeParagraphs = paragraphs
                 .Where(p => p.Document?.IsActive == true)
+                .Where(p => PassesSourceFilter(p, request.SourceFilter))
                 .ToList();
 
             // Загрузка векторов в память для поиска
@@ -132,27 +133,43 @@ namespace SemanticSearch.Application.Services
                 request.Algorithm);
 
             keywordSearchTime = (int)keywordStopwatch.ElapsedMilliseconds;
-
             // Формирование результатов
-            response.Matches = ranked
+            var deduped = ranked
+                .GroupBy(r => r.Paragraph.Content.Trim().ToLowerInvariant())
+                .Select(g => g.OrderByDescending(r => r.TotalScore).First())
+                .OrderByDescending(r => r.TotalScore)
+                .ToList();
+
+            response.Matches = deduped
                 .Take(request.TopK)
-                .Select((r, idx) => new SearchMatchDto
+                .Select((r, idx) =>
                 {
-                    ParagraphId = r.Paragraph.Id,
-                    DocumentId = r.Paragraph.DocumentId,
-                    DocumentTitle = r.Paragraph.Document?.Title ?? "Unknown",
-                    ParagraphContent = r.Paragraph.Content,
+                    var meta = ParseMetadata(r.Paragraph.Document?.Metadata);
 
-                    RelevanceScore = Math.Round(r.TotalScore * 100, 2),
-                    VectorScore = Math.Round(r.VectorScore * 100, 2),
-                    KeywordScore = 0,
-
-                    Rank = idx + 1,
-                    HighlightedWords = new List<string>(),
-                    ScoreBreakdown = new Dictionary<string, double>
+                    return new SearchMatchDto
                     {
-                        ["vector"] = r.TotalScore
-                    }
+                        ParagraphId = r.Paragraph.Id,
+                        DocumentId = r.Paragraph.DocumentId,
+                        DocumentTitle = r.Paragraph.Document?.Title ?? "Unknown",
+                        ParagraphContent = r.Paragraph.Content,
+                        SourceUrl = r.Paragraph.Document?.SourceUrl,
+                        SourceName = meta.Source,
+                        Authors = meta.Authors,
+                        PublicationDate = meta.PublicationDate,
+                        CitationCount = meta.CitationCount,
+                        SourceType = r.Paragraph.Document?.SourceType ?? "manual",
+
+                        RelevanceScore = Math.Round(r.TotalScore * 100, 2),
+                        VectorScore = Math.Round(r.VectorScore * 100, 2),
+                        KeywordScore = 0,
+
+                        Rank = idx + 1,
+                        HighlightedWords = new List<string>(),
+                        ScoreBreakdown = new Dictionary<string, double>
+                        {
+                            ["vector"] = r.TotalScore
+                        }
+                    };
                 })
                 .ToList();
 
@@ -333,6 +350,75 @@ namespace SemanticSearch.Application.Services
         private async Task LogQueryAsync(SearchRequestDto request, SearchResponseDto response)
         {
             await Task.CompletedTask;
+        }
+        private static (string? Source, string? Authors, string? PublicationDate, int? CitationCount) ParseMetadata(string? metadata)
+        {
+            if (string.IsNullOrWhiteSpace(metadata)) return (null, null, null, null);
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(metadata);
+                var root = doc.RootElement;
+
+                string? source = null;
+                if (root.TryGetProperty("source", out var s) && s.ValueKind == System.Text.Json.JsonValueKind.String)
+                    source = s.GetString();
+
+                string? authors = null;
+                if (root.TryGetProperty("authors", out var a) && a.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    var list = a.EnumerateArray()
+                        .Where(x => x.ValueKind == System.Text.Json.JsonValueKind.String)
+                        .Select(x => x.GetString())
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .ToList();
+                    authors = list.Count > 3
+                        ? string.Join(", ", list.Take(3)) + " et al."
+                        : string.Join(", ", list);
+                    if (string.IsNullOrWhiteSpace(authors)) authors = null;
+                }
+
+                string? date = null;
+                if (root.TryGetProperty("publication_date", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String)
+                    date = d.GetString();
+
+                // БЕЗОПАСНО: сначала проверяем Kind, только потом читаем число
+                int? citations = null;
+                if (root.TryGetProperty("citation_count", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    citations = c.GetInt32();
+
+                return (source, authors, date, citations);
+            }
+            catch
+            {
+                return (null, null, null, null);
+            }
+        }
+        private static bool PassesSourceFilter(Paragraph p, IReadOnlyCollection<string>? filter)
+        {
+            if (filter is null || filter.Count == 0)
+                return true;
+
+            var src = p.Document?.SourceType;
+            var meta = p.Document?.Metadata;
+            string? apiSource = null;
+            if (!string.IsNullOrWhiteSpace(meta))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(meta);
+                    if (doc.RootElement.TryGetProperty("source", out var s))
+                        apiSource = s.GetString();
+                }
+                catch { /* ignore */ }
+            }
+
+            // Если документ из API — проверяем имя API ("openalex" / "semanticscholar")
+            if (apiSource != null)
+                return filter.Contains(apiSource, StringComparer.OrdinalIgnoreCase);
+
+            // Если документ не из API (manual / research / generated) —
+            // его "ключ" в фильтре = "local"
+            return filter.Contains("local", StringComparer.OrdinalIgnoreCase);
         }
     }
 }

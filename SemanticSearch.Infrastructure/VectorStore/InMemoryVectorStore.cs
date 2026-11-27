@@ -25,7 +25,7 @@ namespace SemanticSearch.Infrastructure.VectorStore
             if (vector.Length != _dimension)
                 throw new ArgumentException($"Vector dimension must be {_dimension}");
 
-            // Нормализуем вектор для косинусного сходства
+            // Нормализуется вектор для косинусного сходства
             var normalized = VectorMath.Normalize(vector);
             _vectors[paragraphId] = normalized;
             return Task.CompletedTask;
